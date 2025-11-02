@@ -1,0 +1,72 @@
+name: app-ci-cd
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: lab9-ecr-repo
+  ECS_CLUSTER: lab9-cluster
+  ECS_SERVICE: lab9-service
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create warmup artifact
+        run: echo "Hello from Sai Krishna Praneeth Talari" > hello-6652.txt
+
+      - name: Upload warmup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-6652
+          path: hello-6652.txt
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+
+  deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials for OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::402782411476:role/lab9-github-oidc-role
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Image
+        run: |
+          set -e
+          SHA=$(git rev-parse --short HEAD)
+          IMAGE="402782411476.dkr.ecr.us-east-1.amazonaws.com/lab9-ecr-repo:${SHA}-6652"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Render task definition
+        run: |
+          sed "s|IMAGE_URI|${IMAGE}|g" ecs-taskdef-template.json > taskdef.json
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: taskdef.json
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
