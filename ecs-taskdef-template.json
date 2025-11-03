@@ -1,17 +1,23 @@
 {
   "family": "lab9-task",
-  "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::402782411476:role/lab9-ecs-execution-role",
   "containerDefinitions": [
     {
-      "name": "app",
-      "image": "IMAGE_URI",
+      "name": "lab9-container",
+      "image": "402782411476.dkr.ecr.us-east-1.amazonaws.com/lab9-ecr-repo:fixed3",
       "essential": true,
+      "memory": 512,
+      "cpu": 256,
       "portMappings": [
-        { "containerPort": 8080, "protocol": "tcp" }
+        {
+          "containerPort": 80,
+          "hostPort": 80
+        }
       ]
     }
-  ]
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "256",
+  "memory": "512"
 }
